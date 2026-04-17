@@ -7,7 +7,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        name: [Ubuntu-GCC, Ubuntu-MinGW, Windows-MSVC, Windows-MinGW, macOS-Clang, macOS-Clang-framework]
+        name: [Ubuntu-GCC, Ubuntu-MinGW, Windows-MSVC, Windows-MinGW, Windows-MSVC-ARM64, macOS-Clang, macOS-Clang-framework]
         shared_libs: [ON, OFF]
         include:
           - name: Ubuntu-GCC
@@ -54,18 +54,6 @@ jobs:
             vcpkg_triplet: arm64-windows
             cmake_arch: ARM64
             cmake_generator: "Visual Studio 17 2022"
-            # ASIO_SDK_ZIP_PATH needs to be quoted or CMake will save the download to
-            # asiosdk instead of asiosdk.zip.
-            asio_sdk_cache_path: "asiosdk.zip"
-            # Somehow CMake fails to find the toolchain file if a relative path is used on Windows.
-            cmake_options:
-              -DPA_USE_ASIO=ON
-              -DASIO_SDK_ZIP_PATH="asiosdk.zip"
-          - name: Windows-MinGW-ARM64
-            os: windows-11-arm
-            vcpkg_triplet: arm64-mingw-static
-            cmake_arch: ARM64
-            cmake_generator: "MinGW Makefiles"
             # ASIO_SDK_ZIP_PATH needs to be quoted or CMake will save the download to
             # asiosdk instead of asiosdk.zip.
             asio_sdk_cache_path: "asiosdk.zip"
