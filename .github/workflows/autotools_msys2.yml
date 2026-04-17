@@ -25,65 +25,70 @@ env:
 
 jobs:
   msys2:
-    name: msys2-${{ matrix.name }}
+    name: msys2-${{ matrix.msystem }}
     runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - name: UCRT64
-            msystem: UCRT64
+          - msystem: UCRT64
             pkg: mingw-w64-ucrt-x86_64-gcc
-
-          - name: CLANGARM64
-            msystem: CLANGARM64
+          - msystem: CLANGARM64
             pkg: mingw-w64-clang-aarch64-gcc
     defaults:
       run:
         shell: msys2 {0}
     steps:
     - name: checkout PortAudio git repo
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
+
     - name: setup msys2
       uses: msys2/setup-msys2@v2
       with:
         msystem: ${{ matrix.msystem }}
-        install: git ${{ matrix.pkg }}
         update: true
-    # regenerate configure script due to MSYS2 "Known Issues" see: https://www.msys2.org/docs/autotools/
-    - name: setup autotools for autoreconf
-      run: |
-        pacman --noconfirm -S "${MINGW_PACKAGE_PREFIX}-autotools"
-        pacman --noconfirm -S "autoconf-archive"
+        # Install everything here to ensure a stable environment and avoid 'cygheap' errors
+        install: >-
+          git
+          autoconf
+          automake
+          libtool
+          autoconf-archive
+          pkg-config
+          make
+          ${{ matrix.pkg }}
+
     - name: autoreconf
-      run: |
-        autoreconf -fvi
-    # test configure and build
+      run: autoreconf -fvi
+
     - name: configure
       run: ./configure --prefix=${{ env.PORTAUDIO_INSTALL_DIR }}
+
     - name: make
       run: make
-    # test make install
+
     - name: install
       run: make install
-    - name: list install dirs (post-install)
-      run: ls ${{ env.PORTAUDIO_INSTALL_DIR }} ${{ env.BIN_PATH }} ${{ env.C_INCLUDE_PATH }} ${{ env.LIBRARY_PATH }}
-    - name: build patest_init.c (test just calls Pa_Initialize();Pa_Terminate();)
+
+    - name: build patest_init.c
       run: |
-        C_INCLUDE_PATH=${{ env.C_INCLUDE_PATH }}
-        LIBRARY_PATH=${{ env.LIBRARY_PATH }}
-        ${CC:-cc} -o patest_init.exe ./test/patest_init.c -lportaudio
-        ls
+        # Use gcc directly; msys2 maps this to the correct compiler for the current MSYSTEM
+        gcc -o patest_init.exe ./test/patest_init.c -I${{ env.C_INCLUDE_PATH }} -L${{ env.LIBRARY_PATH }} -lportaudio
+
     - name: run patest_init.exe
       run: |
         export PATH=${{ env.BIN_PATH }}:$PATH
         ./patest_init.exe
-      # test make uninstall
+
     - name: uninstall
       run: make uninstall
-    - name: list install dirs (post-uninstall)
-      run: ls ${{ env.PORTAUDIO_INSTALL_DIR }} ${{ env.BIN_PATH }} ${{ env.C_INCLUDE_PATH }} ${{ env.LIBRARY_PATH }}
+
     - name: build patest_init.c to check uninstall (expect failure)
       run: |
-        C_INCLUDE_PATH=${{ env.C_INCLUDE_PATH }}
-        LIBRARY_PATH=${{ env.LIBRARY_PATH }}
-        if ${CC:-cc} -o patest_init.exe ./test/patest_init.c -lportaudio; then exit 1; else exit 0; fi
+        if gcc -o patest_init.exe ./test/patest_init.c -I${{ env.C_INCLUDE_PATH }} -L${{ env.LIBRARY_PATH }} -lportaudio; then 
+          echo "Error: Build should have failed after uninstall"
+          exit 1
+        else 
+          echo "Success: Build failed as expected"
+          exit 0
+        fi
