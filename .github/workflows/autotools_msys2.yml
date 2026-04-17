@@ -2,7 +2,7 @@ name: MSYS2 autotools build (Windows)
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, test_ci ]
   pull_request:
     branches: [ master ]
 
@@ -24,9 +24,21 @@ env:
   BIN_PATH: ${HOME}/.local/bin
 
 jobs:
-  msys2-ucrt64:
-    # based on official recommended msys2 CI setup. see:  https://www.msys2.org/docs/ci/
-    runs-on: windows-latest
+  msys2:
+    name: msys2-${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - name: UCRT64
+            msystem: UCRT64
+            pkg: mingw-w64-ucrt-x86_64-gcc
+            runner: windows-latest
+
+          - name: CLANGARM64
+            msystem: CLANGARM64
+            pkg: mingw-w64-clang-aarch64-gcc
+            runner: windows-11-arm
     defaults:
       run:
         shell: msys2 {0}
@@ -36,9 +48,9 @@ jobs:
     - name: setup msys2
       uses: msys2/setup-msys2@v2
       with:
-        msystem: UCRT64
+        msystem: ${{ matrix.msystem }}
+        install: git ${{ matrix.pkg }}
         update: true
-        install: git mingw-w64-ucrt-x86_64-gcc
     # regenerate configure script due to MSYS2 "Known Issues" see: https://www.msys2.org/docs/autotools/
     - name: setup autotools for autoreconf
       run: |
@@ -61,7 +73,7 @@ jobs:
       run: |
         C_INCLUDE_PATH=${{ env.C_INCLUDE_PATH }}
         LIBRARY_PATH=${{ env.LIBRARY_PATH }}
-        gcc -o patest_init.exe ./test/patest_init.c -lportaudio
+        ${CC} -o patest_init.exe ./test/patest_init.c -lportaudio
         ls
     - name: run patest_init.exe
       run: |
@@ -76,4 +88,4 @@ jobs:
       run: |
         C_INCLUDE_PATH=${{ env.C_INCLUDE_PATH }}
         LIBRARY_PATH=${{ env.LIBRARY_PATH }}
-        if gcc -o patest_init.exe ./test/patest_init.c -lportaudio; then exit 1; else exit 0; fi
+        if ${CC} -o patest_init.exe ./test/patest_init.c -lportaudio; then exit 1; else exit 0; fi
