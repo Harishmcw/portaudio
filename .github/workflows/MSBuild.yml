@@ -13,7 +13,7 @@ env:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.BUILD_PLATFORM == 'ARM64' && 'windows-11-arm' || 'windows-latest' }}
     strategy:
       matrix:
         BUILD_CONFIGURATION: [Release]
